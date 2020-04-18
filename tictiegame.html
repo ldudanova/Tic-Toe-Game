@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tick-Tack-Toe</title>
+</head>
+
+<body>
+    <div id="table-view">
+    </div>
+
+    <div class="score scoreX">Счет X: <span id="X"></span></div>
+    <div class="score scoreO">Счет O: <span id="O"></span></div>
+    <div id="whose-turn-output">Ходит:&nbsp;</div>
+    <button id="reset">Начать с начала</button>
+    <style>
+        table {
+            width: 600px;
+            height: 600px;
+            text-align: center;
+            border-collapse: collapse;
+            table-layout: fixed;
+            margin: auto;
+            background: #fff;
+        }
+        
+        td {
+            border-bottom: 1px solid #000;
+            border-right: 1px solid #000;
+        }
+        
+        td:last-child {
+            border-right: none;
+        }
+        
+        tr:last-child td {
+            border-bottom: 0;
+        }
+    </style>
+
+
+    <script>
+        let field = [
+            [0, 0, 0],
+            [0, 0, 0],
+            [0, 0, 0],
+        ]
+
+        let XisNext = true,
+            xScore = 0,
+            oScore = 0,
+            whoseTurnOutput = document.getElementById('whose-turn-output'),
+            cellsArray = document.getElementsByClassName('field-cell'),
+            gameField = document.querySelector('#table-view'),
+            reset_btn = document.querySelector('#reset'),
+            xScoreOutput = document.querySelector('#X'),
+            oScoreOutput = document.querySelector('#O');
+
+
+        function newGame() {
+            if (localStorage.getItem('field') !== null) {
+                field = JSON.parse(localStorage.getItem('field'));
+                XisNext = JSON.parse(localStorage.getItem('whoseTurn'));
+                xScore = JSON.parse(localStorage.getItem('xScore'));
+                oScore = JSON.parse(localStorage.getItem('oScore'));
+
+                xScoreOutput.innerText = xScore;
+                oScoreOutput.innerText = oScore;
+
+            }
+        }
+        newGame();
+        showTurn();
+        draw();
+
+
+        // Cell filling
+        function cellFilling(filling) {
+            switch (filling) {
+                case 0:
+                    return '&nbsp;';
+                case 1:
+                    return "X";
+                case -1:
+                    return "O";
+            }
+        }
+
+        // Draw the field  
+        function draw() {
+            var tableView = document.querySelector('#table-view');
+
+            var code = '<table id="tic-toe-table">';
+            for (var row = 0; row < field.length; row++) {
+                code += '<tr>';
+                for (var col = 0; col < field[row].length; col++) {
+                    code += '<td class="field-cell">' + cellFilling(field[row][col]) + '</td>';
+                }
+                code += '</tr>';
+            }
+            code += '</table>';
+            tableView.innerHTML = code;
+        }
+
+        gameField.addEventListener('click', function(event) {
+            let target_cell = event.target;
+            if (target_cell.tagName != 'td')
+                takeStep(target_cell);
+        })
+
+
+        // Players' order
+        function switchTurn() {
+            XisNext = !XisNext;
+            showTurn();
+            localStorage.setItem('whoseTurn', JSON.stringify(XisNext));
+        }
+
+        function showTurn() {
+            // review - if(XisNext) тоже самое что строка ниже, это по теме приведение типов в JS.
+            whoseTurnOutput.innerText = `Ходит: ${XisNext ? 'O' : 'X'}`;
+
+        }
+
+        // Check the cell
+        // и вообще аргумент тут не используется).  -> my answer: аргумент используется для заполнения ячейки через .innerText
+        function cellCheck(cell) {
+            if (field[clickedRow][clickedCol] == 0) {
+                if (XisNext) {
+                    field[clickedRow][clickedCol] = 1; //X
+                    cell.innerText = 'X';
+                } else {
+                    field[clickedRow][clickedCol] = -1; //O
+                    cell.innerText = 'O';
+                }
+                saveField(field);
+                switchTurn();
+                whoIsWinner();
+            } else {
+                alert("Клетка занята. Попробуйте другую.")
+            }
+        }
+
+
+        function showDelayedAlert(msg) {
+            setTimeout(() => {
+                alert(msg)
+                clearField();
+                saveField(field);
+            }, 100);
+        }
+
+        // Reset game
+        reset_btn.addEventListener('click', function reset() {
+            clearField();
+            xScore = 0;
+            oScore = 0;
+            xScoreOutput.innerText = '0';
+            oScoreOutput.innerText = '0';
+            localStorage.removeItem('field');
+            localStorage.removeItem('xScore');
+            localStorage.removeItem('oScore');
+            localStorage.removeItem('whoseTurn');
+        })
+
+        function clearField() {
+            field = [
+                [0, 0, 0],
+                [0, 0, 0],
+                [0, 0, 0],
+            ];
+            draw();
+        }
+
+
+        function XorO(result) {
+            if (result == 3) {
+                showDelayedAlert('Крестики победили!');
+                xScore++;
+                xScoreOutput.innerText = xScore;
+                // review - вызов функции saveScore можно вынести из условия ИФ так как у тебя в любом случае произойдёт этот вызов. -> my answer: не могу согласится. return true завершает действие ИФ и выполняет выход из функции. А значит то, что все что ниже не выполняется. 
+                saveScore(xScore, oScore);
+                return true; // здесь произойдет выход из функции
+            } else if (result == -3) {
+                showDelayedAlert('Нолики победили!');
+                oScore++;
+                oScoreOutput.innerText = oScore;
+                saveScore(xScore, oScore);
+                return true;
+            }
+            return false;
+        }
+
+        //
+        function whoIsWinner() {
+
+            const winningPositionsFunc = [
+                checkRow,
+                checkCol,
+                diaTopLeftBottomRight,
+                diaTopRightBottomLeft
+            ];
+            const doesExistWinningPosition = winningPositionsFunc.find(fn => fn());
+            if (!doesExistWinningPosition) {
+                drawnGame();
+            }
+        }
+
+        // Across check function
+
+        // review - код функций checkRow и checkCol одинаковый, тоесть можно его в одном экземпляре где то хранить -> my answer: не совсем понимаю как 
+
+        function checkRow() {
+            for (var row = 0; row < field.length; row++) {
+                var rowResult = 0;
+                for (var col = 0; col < field[row].length; col++) {
+                    rowResult += field[row][col]
+                }
+                var res = XorO(rowResult);
+                if (res == true) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+
+        // Vertical check function
+        function checkCol() {
+            for (var col = 0; col < field.length; col++) {
+                var colResult = 0;
+                for (var row = 0; row < field[col].length; row++) {
+                    colResult += field[row][col]
+                }
+                var res = XorO(colResult);
+                if (res == true) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Diagonal (from top left to bottom right)
+        function diaTopLeftBottomRight() {
+            var diaResult = 0;
+            for (var i = 0; i < field.length; i++) {
+                diaResult += field[i][i]
+            }
+            var res = XorO(diaResult);
+            if (res == true) {
+                return true;
+            }
+            return false;
+        }
+
+        // Diagonal (from top right to bottom left)
+        function diaTopRightBottomLeft() {
+            var diaResult = 0;
+            for (var row = 0; row < field.length; row++) {
+                var col = (field.length - 1) - row;
+                diaResult += field[row][col]
+
+            }
+            var res = XorO(diaResult);
+            return res;
+        }
+
+        // Drawn function
+
+        function drawnGame() {
+            // review - не сразу понял зачем этот код тут, лучше вынести в функции его.. -> my answer: не поняла этот комментарий
+            for (var row = 0; row < field.length; row++) {
+                for (var col = 0; col < field.length; col++) {
+                    if (field[row][col] == 0) {
+                        return;
+                    }
+                }
+            }
+            showDelayedAlert('Ничья!');
+        }
+
+        var clickedRow;
+        var clickedCol;
+
+        function setIndex(element) {
+            clickedRow = element.parentNode.rowIndex;
+            clickedCol = element.cellIndex;
+        }
+
+
+        function takeStep(a) {
+            setIndex(a);
+            cellCheck(a);
+        }
+
+
+        function saveField(f) {
+            var storedGameField = 0;
+            localStorage.setItem('field', JSON.stringify(f));
+            storedGameField = JSON.parse(localStorage.getItem('field'));
+        }
+
+        function saveScore(x, o) {
+            localStorage.setItem('xScore', JSON.stringify(x));
+            localStorage.setItem('oScore', JSON.stringify(o));
+        }
+    </script>
+</body>
+
+</html>
